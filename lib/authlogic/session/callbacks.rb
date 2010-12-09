@@ -53,17 +53,24 @@ module Authlogic
     # You can NOT define a "before_validation" method, this is bad practice and does not allow Authlogic
     # to extend properly with multiple extensions. Please ONLY use the method above.
     module Callbacks
-      METHODS = [
-        "before_persisting", "persist", "after_persisting",
+      TERMINATE_ON_TRUE_METHODS = [
+        "persist"
+      ]
+      
+      TERMINATE_ON_FALSE_METHODS = [
+        "before_persisting", "after_persisting",
         "before_validation", "before_validation_on_create", "before_validation_on_update", "validate",
         "after_validation_on_update", "after_validation_on_create", "after_validation",
         "before_save", "before_create", "before_update", "after_update", "after_create", "after_save",
         "before_destroy", "after_destroy"
       ]
       
+      METHODS = TERMINATE_ON_TRUE_METHODS + TERMINATE_ON_FALSE_METHODS
+      
       def self.included(base) #:nodoc:
         base.send :include, ActiveSupport::Callbacks
-        base.define_callbacks *METHODS
+        base.define_callbacks *TERMINATE_ON_TRUE_METHODS, :terminator => 'result == true'
+        base.define_callbacks *TERMINATE_ON_FALSE_METHODS, :terminator => 'result == false'
         
         # If Rails 3, support the new callback syntax
         if base.send(base.respond_to?(:singleton_class) ? :singleton_class : :metaclass).method_defined?(:set_callback)
@@ -81,13 +88,9 @@ module Authlogic
         METHODS.each do |method|
           class_eval <<-"end_eval", __FILE__, __LINE__
             def #{method}
-              run_callbacks(:#{method}) { |result, object| result == false }
+              run_callbacks(:#{method})
             end
           end_eval
-        end
-      
-        def persist
-          run_callbacks(:persist) { |result, object| result == true }
         end
         
         def save_record(alternate_record = nil)
