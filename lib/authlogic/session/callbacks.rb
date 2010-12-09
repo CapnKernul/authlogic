@@ -53,9 +53,7 @@ module Authlogic
     # You can NOT define a "before_validation" method, this is bad practice and does not allow Authlogic
     # to extend properly with multiple extensions. Please ONLY use the method above.
     module Callbacks
-      TERMINATE_ON_TRUE_METHODS = [
-        "persist"
-      ]
+      TERMINATE_ON_TRUE_METHODS = ["persist"]
       
       TERMINATE_ON_FALSE_METHODS = [
         "before_persisting", "after_persisting",
@@ -69,34 +67,35 @@ module Authlogic
       
       def self.included(base) #:nodoc:
         base.send :include, ActiveSupport::Callbacks
-        base.define_callbacks *TERMINATE_ON_TRUE_METHODS, :terminator => 'result == true'
-        base.define_callbacks *TERMINATE_ON_FALSE_METHODS, :terminator => 'result == false'
+        base.define_callbacks(*(TERMINATE_ON_TRUE_METHODS + [{ :terminator => 'result == true'}]))
+        base.define_callbacks(*(TERMINATE_ON_FALSE_METHODS + [{ :terminator => 'result == false'}]))
         
         # If Rails 3, support the new callback syntax
         if base.send(base.respond_to?(:singleton_class) ? :singleton_class : :metaclass).method_defined?(:set_callback)
           METHODS.each do |method|
-            base.class_eval <<-"end_eval", __FILE__, __LINE__
+            base.class_eval <<-RUBY_EVAL, __FILE__, __LINE__ + 1
               def self.#{method}(*methods, &block)
                 set_callback :#{method}, *methods, &block
               end
-            end_eval
+            RUBY_EVAL
           end
         end
       end
       
       private
-        METHODS.each do |method|
-          class_eval <<-"end_eval", __FILE__, __LINE__
-            def #{method}
-              run_callbacks(:#{method})
-            end
-          end_eval
-        end
-        
-        def save_record(alternate_record = nil)
-          r = alternate_record || record
-          r.save_without_session_maintenance(false) if r && r.changed? && !r.readonly?
-        end
+      
+      METHODS.each do |method|
+        class_eval <<-RUBY_EVAL, __FILE__, __LINE__ + 1
+          def #{method}
+            run_callbacks :#{method}
+          end
+        RUBY_EVAL
+      end
+      
+      def save_record(alternate_record = nil)
+        r = alternate_record || record
+        r.save_without_session_maintenance(false) if r && r.changed? && !r.readonly?
+      end
     end
   end
 end
